@@ -321,6 +321,7 @@ impl VerkleTree {
 
     // This function computes batch proofs, is also works if the NONE values are already deleted.
     pub fn batch_proof_verify (root: Commitment, mut tree_proofs: Vec<Option<ProofNode>>, width: usize, indices: Vec<usize>, depth: usize, data: Vec<Vec<u8>>) -> bool {
+        println!("start checking parameters");
         assert!(tree_proofs[0].is_some());
 
         // Check if the root is correct
@@ -338,6 +339,7 @@ impl VerkleTree {
             println!("The tree proofs vector is not of the correct length");
             return false;
         }
+        println!("start making vector");
         // To find the commitment value easier, we dont save the ProofNodes but the commitments in the next vector
         let mut commitments_vector: Vec<Vec<u8>> = tree_proofs.iter().map(|proof_node|
             {
@@ -347,8 +349,10 @@ impl VerkleTree {
         ).collect();
         data.iter().for_each(|d| commitments_vector.push(d.to_vec()));
         
+        println!("pp tree");
         let (_, verifier_params) =
             paramgen_from_seed("This is our Favourite very very long Seed", 0, width).unwrap();
+        println!("start verify");
         tree_proofs.par_iter().all(|proof_node| {
             if let Some(node) = proof_node{
                 let b1 = Proof::same_commit_batch_verify(&node.proof, &verifier_params, &node.commitment, &node.indices, &node.values);
@@ -362,6 +366,7 @@ impl VerkleTree {
                 true
             }
         });
+        println!("done verify");
         true
     }
 
