@@ -9,61 +9,62 @@ use std::io::Write;
 use ark_bls12_381::Fr as F;
 use rand::Rng;
 use rand::prelude::*;
-use verkle_tree::*;
+//use verkle_tree::*;
 mod verkle_tree_point;
+use verkle_tree::VerkleTree_new;
 use verkle_tree_point::{VerkleTree as VerkleTree_point};
 
 mod verkle_tree_point_test;
 
 
-fn test_batch_proof_verify(datas: Vec<F>, filename : String) {
+// fn test_batch_proof_verify(datas: Vec<F>, filename : String) {
 
 
-    let mut file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true) // Clears previous content
-        .open(filename)
-        .expect("Failed to open file");
-    writeln!(file, "{:<5} {:15} {:<15} {:<15} {:<15}", "width", "build tree", "batch proof", "batch verify", "total").expect("Failed to write header");
+//     let mut file = OpenOptions::new()
+//         .create(true)
+//         .write(true)
+//         .truncate(true) // Clears previous content
+//         .open(filename)
+//         .expect("Failed to open file");
+//     writeln!(file, "{:<5} {:15} {:<15} {:<15} {:<15}", "width", "build tree", "batch proof", "batch verify", "total").expect("Failed to write header");
 
-    //for width in [8]{
-    let width = 8;
+//     //for width in [8]{
+//     let width = 8;
 
-    let starttree = Instant::now();
-        let tree = VerkleTree::new(&datas, width).unwrap();
-    let endtree = starttree.elapsed();
-    let depth = tree.depth();
-    //println!("lets try {}", datas.len().ilog(width) -1 );
-    //println!("depth = {}", depth);
-    // //println!("datas len {}", datas.len());
-    let indices: Vec<usize> = (0..=(datas.len()-1) )
-        .choose_multiple(&mut thread_rng(),(datas.len() as f64 *(0.2))as usize);
-        //.choose_multiple(&mut thread_rng(),2_usize);
-    //println!("indices = {:?}", indices);
+//     let starttree = Instant::now();
+//         let tree = VerkleTree::new(&datas, width).unwrap();
+//     let endtree = starttree.elapsed();
+//     let depth = tree.depth();
+//     //println!("lets try {}", datas.len().ilog(width) -1 );
+//     //println!("depth = {}", depth);
+//     // //println!("datas len {}", datas.len());
+//     let indices: Vec<usize> = (0..=(datas.len()-1) )
+//         .choose_multiple(&mut thread_rng(),(datas.len() as f64 *(0.2))as usize);
+//         //.choose_multiple(&mut thread_rng(),2_usize);
+//     //println!("indices = {:?}", indices);
 
-    let startproof = Instant::now();
-    let proof = tree.generate_batch_proof(indices.clone(), &datas);
-    let endproof= startproof.elapsed();
-    println!("total proof time {:?}", endproof);
+//     let startproof = Instant::now();
+//     let proof = tree.generate_batch_proof(indices.clone(), &datas);
+//     let endproof= startproof.elapsed();
+//     println!("total proof time {:?}", endproof);
 
-    let root = VerkleTree::root_commitment(&tree).unwrap();
+//     let root = VerkleTree::root_commitment(&tree).unwrap();
 
-    let mut datas_verify = Vec::new();
-    for i in indices.clone() {
-        datas_verify.push(datas[i]);
-    }
+//     let mut datas_verify = Vec::new();
+//     for i in indices.clone() {
+//         datas_verify.push(datas[i]);
+//     }
 
 
-    let startverify = Instant::now();
-    let b = VerkleTree::batch_proof_verify(root, proof.clone(), width, indices, depth, datas_verify);
-    let endverify= startverify.elapsed();
+//     let startverify = Instant::now();
+//     let b = VerkleTree::batch_proof_verify(root, proof.clone(), width, indices, depth, datas_verify);
+//     let endverify= startverify.elapsed();
 
-    writeln!(file, "{:<5} {:<15.1?} {:<15.1?} {:<15.1?} {:<15.1?}", width, endtree, endproof, endverify, endtree + endproof+endverify).expect("Failed to write values");
-    println!("b {}", b);
-    //}
+//     writeln!(file, "{:<5} {:<15.1?} {:<15.1?} {:<15.1?} {:<15.1?}", width, endtree, endproof, endverify, endtree + endproof+endverify).expect("Failed to write values");
+//     println!("b {}", b);
+//     //}
 
-}
+// }
 
 
 
@@ -154,7 +155,7 @@ fn main (){
     
     println!("start making tree NEW");
     let start = Instant::now();
-    let tree = verkle_tree_point_test::VerkleTree::new(&data, width).unwrap();
+    let tree: verkle_tree_point_test::VerkleTree = verkle_tree_point_test::VerkleTree::new(&data, width).unwrap();
     let tree_test= start.elapsed();
     println!("Tree is constructed");
     
@@ -165,12 +166,32 @@ fn main (){
     let endproof_test= startproof.elapsed();
     println!("We are done proving");
 
+    println!("Commitment");
+    let root = tree.root_commitment().unwrap();
+    let depth = tree.depth();
+    println!("commitment done");
+
+    println!("data to verify");
+
+    let mut datas_verify: Vec<Vec<u8>> = Vec::new();
+    for i in indices.clone() {
+        datas_verify.push(data[i].clone());
+    }
+
+    println!("start verify");
+    let startverify = Instant::now();
+    let b = verkle_tree_point_test::VerkleTree::batch_proof_verify(root, proof.clone(), width, indices, depth, datas_verify);
+    let verify_test= startverify.elapsed();
+    println!("end verify");
+
     println!("start making tree OLD");
     let start = Instant::now();
     let tree = verkle_tree_point_test::VerkleTree::new(&data, width).unwrap();
     let tree_old= start.elapsed();
     println!("Tree is constructed");
     
+    let indices: Vec<usize> = (0..=(input_len-1) )
+        .choose_multiple(&mut thread_rng(),(input_len as f64 *(0.2))as usize);
     
     println!("We'll start proving");
     let startproof = Instant::now();
@@ -182,4 +203,6 @@ fn main (){
     println!("OLD tree creation {:?}", tree_old);
     println!("NEW proof time {:?}", endproof_test);
     println!("OLD proof time {:?}", endproof_old);
+    println!("NEW verify time {:?}", verify_test);
+    //println!("OLD proof time {:?}", endproof_old);
 }
