@@ -147,6 +147,8 @@ fn main (){
     // }
     // println!("data length {}", datas.len());
     let width = 16;
+    let (prover_params, verifier_params) =
+        pointproofs::pairings::param::paramgen_from_seed("This is our Favourite very very long Seed", 0, width).unwrap();
     let input_len = usize::pow(2,16);
     let data = get_receiver_data(input_len); 
     let indices: Vec<usize> = (0..=(input_len-1) )
@@ -155,7 +157,7 @@ fn main (){
     
     println!("start making tree NEW");
     let start = Instant::now();
-    let tree: verkle_tree_point_test::VerkleTree = verkle_tree_point_test::VerkleTree::new(&data, width).unwrap();
+    let tree: verkle_tree_point_test::VerkleTree = verkle_tree_point_test::VerkleTree::new(&data, width, prover_params).unwrap();
     let tree_test= start.elapsed();
     println!("Tree is constructed");
     
@@ -180,13 +182,13 @@ fn main (){
 
     println!("start verify");
     let startverify = Instant::now();
-    let b = verkle_tree_point_test::VerkleTree::batch_proof_verify(root, proof.clone(), width, indices, depth, datas_verify);
+    let b = verkle_tree_point_test::VerkleTree::batch_proof_verify(root, proof.clone(), width, indices, depth, datas_verify, verifier_params);
     let verify_test= startverify.elapsed();
     println!("end verify");
 
     println!("start making tree OLD");
     let start = Instant::now();
-    let tree = verkle_tree_point_test::VerkleTree::new(&data, width).unwrap();
+    let tree = verkle_tree_point::VerkleTree::new(&data, width).unwrap();
     let tree_old= start.elapsed();
     println!("Tree is constructed");
     

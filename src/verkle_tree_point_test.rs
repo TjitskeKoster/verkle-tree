@@ -35,10 +35,10 @@ pub struct ProofNode {
 
 impl VerkleTree {
     // Initialize a new tree
-    pub fn new(datas: &[Vec<u8>], width: usize) -> Result<Self, VerkleTreeError> {
+    pub fn new(datas: &[Vec<u8>], width: usize, prover_params: ProverParams) -> Result<Self, VerkleTreeError> {
         println!("pp");
-        let (prover_params, _) =
-            paramgen_from_seed("This is our Favourite very very long Seed", 0, width).unwrap();
+        //let (prover_params, _) =
+        //    paramgen_from_seed("This is our Favourite very very long Seed", 0, width).unwrap();
         println!("start building");
         Self::build_tree(prover_params, datas, width)
     }
@@ -320,7 +320,7 @@ impl VerkleTree {
     }
 
     // This function computes batch proofs, is also works if the NONE values are already deleted.
-    pub fn batch_proof_verify (root: Commitment, mut tree_proofs: Vec<Option<ProofNode>>, width: usize, indices: Vec<usize>, depth: usize, data: Vec<Vec<u8>>) -> bool {
+    pub fn batch_proof_verify (root: Commitment, mut tree_proofs: Vec<Option<ProofNode>>, width: usize, indices: Vec<usize>, depth: usize, data: Vec<Vec<u8>>, verifier_params: VerifierParams) -> bool {
         println!("start checking parameters");
         assert!(tree_proofs[0].is_some());
 
@@ -349,9 +349,9 @@ impl VerkleTree {
         ).collect();
         data.iter().for_each(|d| commitments_vector.push(d.to_vec()));
         
-        println!("pp tree");
-        let (_, verifier_params) =
-            paramgen_from_seed("This is our Favourite very very long Seed", 0, width).unwrap();
+        // println!("pp tree");
+        // let (_, verifier_params) =
+        //     paramgen_from_seed("This is our Favourite very very long Seed", 0, width).unwrap();
         println!("start verify");
         tree_proofs.par_iter().all(|proof_node| {
             if let Some(node) = proof_node{
