@@ -1,3 +1,6 @@
+use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
 use std::time::Instant;
 
 use std::fs::OpenOptions;
@@ -9,6 +12,8 @@ use rand::prelude::*;
 use verkle_tree::*;
 mod verkle_tree_point;
 use verkle_tree_point::{VerkleTree as VerkleTree_point};
+
+mod verkle_tree_point_test;
 
 
 fn test_batch_proof_verify(datas: Vec<F>, filename : String) {
@@ -111,22 +116,70 @@ fn test_batch_point_proof_verify(datas: Vec<Vec<u8>>, filename : String) {
 
 }
 
+fn get_receiver_data (size_input: usize) -> Vec<Vec<u8>>{
+    let file = File::open("Receiver.txt").expect("failed to open file");
+    let reader = BufReader::new(file);
+
+    let mut input:Vec<Vec<u8>> = Vec::with_capacity(size_input);
+    for line in reader.lines() {
+       let paswd = line.expect("failed to unrap line");
+        if input.len()< size_input{
+            //input.push(paswd.as_bytes().to_vec());
+            input.push(paswd.into_bytes());
+        }
+        else {
+            return input;
+        }
+    }
+    input
+}
 
 fn main (){
     println!("Hello world");
-    let mut datas: Vec<F> = Vec::new();
-    let mut datas_point: Vec<Vec<u8>> =Vec::new();
+    // let mut datas: Vec<F> = Vec::new();
+    // let mut datas_point: Vec<Vec<u8>> =Vec::new();
 
-    for _i in 0.. 4096{
-        let v = rand::thread_rng().gen_range(0..=4096*4096) as u8;
-        datas.push(F::from(v));
-        datas_point.push(vec![v]);
-    }
-    println!("data length {}", datas.len());
-    test_batch_proof_verify(datas.clone(), "test_compare".to_string());
+    // for _i in 0.. 4096{
+    //     let v = rand::thread_rng().gen_range(0..=4096*4096) as u8;
+    //     datas.push(F::from(v));
+    //     datas_point.push(vec![v]);
+    // }
+    // println!("data length {}", datas.len());
+    let width = 16;
+    let input_len = usize::pow(2,16);
+    let data = get_receiver_data(input_len); 
+    let indices: Vec<usize> = (0..=(input_len-1) )
+        .choose_multiple(&mut thread_rng(),(input_len as f64 *(0.2))as usize);
+    println!("got data");
+    
+    println!("start making tree NEW");
+    let start = Instant::now();
+    let tree = verkle_tree_point_test::VerkleTree::new(&data, width).unwrap();
+    let tree_test= start.elapsed();
+    println!("Tree is constructed");
+    
+    
+    println!("We'll start proving");
+    let startproof = Instant::now();
+    let proof = tree.generate_batch_proof(indices.clone(), &data);
+    let endproof_test= startproof.elapsed();
+    println!("We are done proving");
 
-    println!("now point proofs");
-    test_batch_point_proof_verify(datas_point, "test_compare_point".to_string());
+    println!("start making tree OLD");
+    let start = Instant::now();
+    let tree = verkle_tree_point_test::VerkleTree::new(&data, width).unwrap();
+    let tree_old= start.elapsed();
+    println!("Tree is constructed");
+    
+    
+    println!("We'll start proving");
+    let startproof = Instant::now();
+    let proof = tree.generate_batch_proof(indices.clone(), &data);
+    let endproof_old= startproof.elapsed();
+    println!("We are done proving");
 
-
+    println!("NEW tree creation {:?}", tree_test);
+    println!("OLD tree creation {:?}", tree_old);
+    println!("NEW proof time {:?}", endproof_test);
+    println!("OLD proof time {:?}", endproof_old);
 }
