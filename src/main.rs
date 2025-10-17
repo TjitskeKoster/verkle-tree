@@ -154,6 +154,22 @@ fn main (){
     let indices: Vec<usize> = (0..=(input_len-1) )
         .choose_multiple(&mut thread_rng(),(input_len as f64 *(0.2))as usize);
     println!("got data");
+
+
+    println!("start making tree OLD");
+    let start = Instant::now();
+    let tree = verkle_tree_point::VerkleTree::new(&data, width).unwrap();
+    let tree_old= start.elapsed();
+    println!("Tree is constructed");
+    
+    let indices: Vec<usize> = (0..=(input_len-1) )
+        .choose_multiple(&mut thread_rng(),(input_len as f64 *(0.2))as usize);
+    
+    println!("We'll start proving");
+    let startproof = Instant::now();
+    let proof = tree.generate_batch_proof(indices.clone(), &data);
+    let endproof_old= startproof.elapsed();
+    println!("We are done proving");
     
     println!("start making tree NEW");
     let start = Instant::now();
@@ -186,20 +202,6 @@ fn main (){
     let verify_test= startverify.elapsed();
     println!("end verify");
 
-    println!("start making tree OLD");
-    let start = Instant::now();
-    let tree = verkle_tree_point::VerkleTree::new(&data, width).unwrap();
-    let tree_old= start.elapsed();
-    println!("Tree is constructed");
-    
-    let indices: Vec<usize> = (0..=(input_len-1) )
-        .choose_multiple(&mut thread_rng(),(input_len as f64 *(0.2))as usize);
-    
-    println!("We'll start proving");
-    let startproof = Instant::now();
-    let proof = tree.generate_batch_proof(indices.clone(), &data);
-    let endproof_old= startproof.elapsed();
-    println!("We are done proving");
 
     println!("NEW tree creation {:?}", tree_test);
     println!("OLD tree creation {:?}", tree_old);
