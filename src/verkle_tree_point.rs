@@ -1,3 +1,4 @@
+use std::alloc::Layout;
 use std::time::Instant;
 use std::{collections::HashSet, vec};
 
@@ -7,8 +8,9 @@ use pointproofs::pairings::*;
 use pointproofs::pairings::Commitment;
 use rayon::prelude::*;
 
+//#[derive(Debug, Clone)]
 pub struct VerkleTree {
-    root: Option<VerkleNode>,
+    nodes: Vec<Vec<VerkleNode>>,
     width: usize,
     pp: ProverParams,
 }
@@ -16,8 +18,7 @@ pub struct VerkleTree {
 #[derive(Debug, Clone)]
 struct VerkleNode {
     commitment: Commitment,
-    values: Vec<Vec<u8>>,
-    children: Option<Vec<VerkleNode>>,
+    children: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -44,31 +45,33 @@ impl VerkleTree {
         if datas.is_empty() {
           return Err(VerkleTreeError::BuildError);
         }
-        // If the tree is trivial because there is fewer data then children of 1 node:
-        if datas.len() <= width {
-            let commitment: Commitment = Commitment::new(&prover_params, datas).unwrap();
-            return Ok(VerkleTree {
-                root: Some(VerkleNode {
-                    commitment,
-                    values: datas.to_vec(),
-                    children: None,
-                }),
-                width,
-                pp: prover_params,
-            });
-        }
-        // Otherwise we build the tree layer per layer
+        assert!(datas.len().is_multiple_of(width), "Please give a tree that is compeletly filled, i.e. log_{{width}}(data) is a natural number otherwise security can not be guaranteed");
+        
+        // We build the tree layer per layer
         //println!("Start making the first layer with no children");
-        let leaf_nodes = Self::create_leaf_nodes(&prover_params, datas.to_vec(), width);
+        let mut layer = Self::create_leaf_nodes(&prover_params, datas.to_vec(), width);
         //println!("first layer is constructed");
-        let root = Self::build_tree_recursively(&prover_params, &leaf_nodes, width);
-
+        let mut tree: Vec<Vec<VerkleNode>> = Vec::new();
+        tree.push(layer.clone());
+        while layer.len() > 1 {
+            layer = Self::build_layer(&prover_params, &layer, width);
+            tree.push(layer.clone());
+            //println!("next layer is constructed");
+        }
+        // to get the root as first index.
+        tree.reverse();
+        //tree = Self::add_incides(tree);
+        
         Ok(VerkleTree {
-            root: Some(root),
+            nodes: tree,
             width,
             pp: prover_params,
         })
     }
+
+    // fn add_incides( tree: Vec<VerkleNode>) -> Vec<VerkleNode>{
+    //     tree
+    // }
     
     fn create_leaf_nodes(prover_params: &ProverParams, datas: Vec<Vec<u8>>, width: usize) -> Vec<VerkleNode> {
         datas
@@ -78,14 +81,15 @@ impl VerkleTree {
                 let commitment: Commitment = Commitment::new(prover_params, &values).unwrap();
                 VerkleNode {
                     commitment,
-                    values,
-                    children: None,
+                    //values,
+                    children: false,
+                    //index: 0,
                 }
             })
-            .collect()
+            .rev().collect()
     }
 
-    fn build_from_nodes(prover_params: &ProverParams, nodes: &[VerkleNode], width: usize) -> Vec<VerkleNode> {
+    fn build_layer(prover_params: &ProverParams, nodes: &[VerkleNode], width: usize) -> Vec<VerkleNode> {
         nodes
         .par_chunks(width)
             .map(|chunk| {
@@ -96,23 +100,13 @@ impl VerkleTree {
                 let commitment: Commitment = Commitment::new(prover_params, &values).unwrap();
                 VerkleNode {
                     commitment,
-                    values,
-                    children: Some(chunk.to_vec()),
+                    //values,
+                    children: true,
+                    //index: 0,
                 }
             })
-            .collect()
+            .rev().collect()
     }
-
-    fn build_tree_recursively(prover_params: &ProverParams, nodes: &[VerkleNode], width: usize) -> VerkleNode {
-        if nodes.len() == 1 {
-            return nodes[0].clone();
-        }
-        //println!("creating next level:");
-        let next_level = Self::build_from_nodes(prover_params, nodes, width);
-        //println!("next level done");
-        Self::build_tree_recursively(prover_params, &next_level, width)
-    }
-
 /* The next functions are to generate proofs for several indices simultaeusly  */
 
     /*  This function returns a long vector which reads the nodes from top to bottom left to right
@@ -122,137 +116,63 @@ impl VerkleTree {
         assert!(data.len().is_multiple_of(self.width), "Please give a tree that is compeletly filled, i.e. log_{{width}}(data) is a natural number");
         assert!(!index.is_empty(), "Please give a non empty index");
         let width = self.width;
-        let depth = self.depth();
         // The following line creates a vector, on each index is a vector which incidates which children nodes need to be proven
         //println!("create index for proof");
         let index_for_proof = VerkleTree::create_index_for_proof(index, width, self.depth());
         //println!("done creating indices");
+        let tree = self.nodes.clone();
+        // for i in tree.clone(){
+        //     for node in i {
+        //         println!("{}", node.children);
+        //     }
+        // }
+        //println!("tree {:?}", tree);
 
-        let proofs: Vec<Option<ProofNode>> = (0.. index_for_proof.len())
-        .into_par_iter()
-        .map(|ind| {
-            if index_for_proof[ind]!= vec![]  {
-                let path = Self::path_to_child(ind, width);
-
-                let node: VerkleNode = Self::find_commitment_node(self, path);
-                let index_first_child: usize =
-                    if node.children.is_none(){
-                        let index_first_child_data: usize = 
-                            if width == 2 {
-                                usize::pow(width, (depth+1).try_into().unwrap())/(width-1) -1
-                            }
-                            else {
-                                usize::pow(width, (depth+1).try_into().unwrap())/(width-1)
-                            };
-                        width*ind +1 - index_first_child_data
-                    }
-                    else {
-                        width*ind +1
-                    };
-                let proof_of_node = self.find_proof_node(node,  index_for_proof[ind].clone(), data, index_first_child).expect("failed to generate proof for node");
-                Some(proof_of_node)
-            }
-            else {
+        /* We observe that we can compute each node in parallel, so first we flatten the tree structure
+            While, perserving the layer and node index */
+        let flattened_tree: Vec<(usize, usize, &VerkleNode)> = tree.iter()
+            .enumerate()
+            .flat_map(|(layer_index,layer)|{
+                layer.iter().enumerate().map(move |(node_index, node)| (layer_index, node_index, node))
+            }).collect();
+        
+        flattened_tree.par_iter().map(|(layer_index, node_index, node)|{
+            let mut values:Vec<Vec<u8>> = Vec::new();
+            let indices: &Vec<usize> = &index_for_proof[*layer_index][*node_index];
+            let mut proof_indices: Vec<usize> = Vec::new();
+                for index in indices{
+                    proof_indices.push(index % width);
+                }
+            if indices.is_empty() {
                 None
             }
-        }).collect();
-        proofs
-    }
-
-    fn path_to_child (mut index: usize, width: usize) -> Vec<usize> {
-        let mut path : Vec<usize> = Vec::new();
-        if index == 0 {
-            return path;
-        }
-        else {
-            path.push((index-1) % width); //push current node index
-            while index > width{
-                index = (index-1)/width; //compute parent
-                path.push((index-1) % width); //push parent
-            }
-        }
-        path.reverse();
-        path
-
-    }
-
-    fn create_index_for_proof(index: Vec<usize>, width: usize, depth: usize) -> Vec<Vec<usize>> {
-
-        /* This creates a vector of the form:
-            [[2, 0], [1, 2], [], [0]] 
-            The root is on index 0 and children [2,0] need to be proven.
-            etc.
-            */
-        let mut tree_path: Vec<Vec<usize>>  = Vec::new();
-        let mut indexes = index.clone();
-        for level in 1.. (depth+1){
-            let data_level_above = width.pow((depth+1-level) as u32);
-            // This creates for each parent node an empty vector
-            let mut level_above: Vec<Vec<usize>> = vec![vec![]; data_level_above];
-            // This is a hash set to only insert if the node is "new"
-            let mut new_indices: HashSet<usize> = HashSet::new();
-            /* The loop adds the index of the child that needs to be proven in the vector of the parent node
-                This is done modulus the width of the tree. 
-                Also the loop creates a vector for the indices of the parent node for the next layer*/
-            for i in 0.. indexes.len(){
-                level_above[indexes[i] / width].push(indexes[i]% width);
-                new_indices.insert(indexes[i]/ width);
-            }
-            level_above.reverse();
-            for parent in level_above{
-                tree_path.push(parent);
-            }
-            indexes = new_indices.into_iter().collect();
-                
-        }
-        // We need to add the root manually
-        if depth != 0 {
-            let mut node_root: Vec<usize> = Vec::new();
-            for child in 0.. width{
-                if !tree_path[tree_path.len()- child-1].is_empty(){
-                    node_root.push(child);
+            else if node.children {
+                for i in 0 .. width{
+                    let com = &tree[layer_index+1][i].commitment;
+                    let child_commitment = Self::map_commitment_to_vec_u8(&com);
+                    values.push(child_commitment);
                 }
+                Some(self.proof_node(&node.commitment, values, &proof_indices).expect("failed to generate proof for node"))
             }
-            tree_path.push( node_root);
-        }
-        else {
-            // If the tree has 1 layer, the "root" is just the commitment of all indices
-            tree_path = vec![index];
-        }
-        tree_path.reverse();
-        tree_path
-    }
-    
-    fn find_commitment_node(&self, path: Vec<usize>) -> VerkleNode{
-        let mut current_node = self.root.clone().unwrap();
-        for i in path {
-            current_node = current_node.children.expect("failed to find children")[i].clone();
-        }
-        current_node
+            else {
+                // no children so values from the data
+                for i in 0 .. width{
+                    values.push(data[i].clone());
+                }
+                Some(self.proof_node(&node.commitment, values, &proof_indices).expect("failed to generate proof for node"))
+                }
+        }).collect()
+        
     }
 
-    fn find_proof_node (&self, node: VerkleNode, indices_to_proof: Vec<usize>, data: &[Vec<u8>], index_first_child: usize) ->  Result<ProofNode, VerkleTreeError>  {
-        //let mut indices: Vec<usize> = Vec::new();
-        let mut values: Vec<Vec<u8>> = Vec::new();
-        if  let Some(child) = node.children {
-            for child_node in child {
-                let com = child_node.commitment;
-                let child_commitment = Self::map_commitment_to_vec_u8(&com);
-                values.push(child_commitment);
-            }
-        }
-        else {
-            for ind in 0 .. self.width {
-                values.push(data[index_first_child + ind].clone());
-            }
-        }
-        let proof = Proof::batch_new_aggregated(&self.pp, &node.commitment, &values, &indices_to_proof);
+    fn proof_node(&self, commit:&Commitment, values: Vec<Vec<u8>>, indices: &Vec<usize>) -> Result<ProofNode, VerkleTreeError>{
+        let proof = Proof::batch_new_aggregated(&self.pp, commit, &values, indices);
         match proof {
             Ok(proof) => {
                 let proof_node = ProofNode {
-                    commitment: node.commitment,
+                    commitment: commit.clone(),
                     proof,
-                    indices: indices_to_proof,
+                    indices: indices.to_vec(),
                     values,
                 };
                 Ok(proof_node)
@@ -261,9 +181,55 @@ impl VerkleTree {
         }
     }
 
+    fn create_index_for_proof(index: Vec<usize>, width: usize, depth: usize) -> Vec<Vec<Vec<usize>>> {
+
+        /* For widht = 3, depth=2 index = [1,2,6] This creates:
+            [[[0, 2]],
+                [[1, 2], [], [6]]]
+            The first vector is the root, this node needs to prove children on position 0 adn 2 of the next layer.
+            The second vector is the second layer, need to prove node 1, 2 and 6 of the next layer in this case the data set
+            */
+        let mut tree_path: Vec<Vec<Vec<usize>>>  = Vec::new();
+        let mut indexes = index.clone();
+        for level in 2.. (depth+1){
+            let data_level_above = width.pow((depth+1-level) as u32);
+            // This creates for each parent node an empty vector
+            let mut level_above: Vec<Vec<usize>> = vec![vec![]; data_level_above];
+            // This is a hash set to only insert if the node is "new"
+            let mut new_indices: HashSet<usize> = HashSet::new();
+            /* The loop adds the index of the child that needs to be proven in the vector of the parent node
+                Also the loop creates a vector for the indices of the parent node for the next layer*/
+            for i in 0.. indexes.len(){
+                level_above[indexes[i] / width].push(indexes[i]);
+                new_indices.insert(indexes[i]/ width);
+            }
+            tree_path.push(level_above);
+            indexes = new_indices.into_iter().collect();
+                
+        }
+        // We need to add the root manually
+        if depth != 0 {
+            let mut node_root: Vec<usize> = Vec::new();
+            for i in 0 .. width{
+                let child  = &tree_path[tree_path.len()-1][i];
+                if !child.is_empty(){
+                    node_root.push(i);
+                }
+            }
+            tree_path.push( vec![node_root]);
+        }
+        else {
+            // If the tree has 1 layer, the "root" is just the commitment of all indices
+            tree_path = vec![vec![index]];
+        }
+        tree_path.reverse();
+        tree_path
+    }
+    
+
     // This function computes batch proofs, is also works if the NONE values are already deleted.
     pub fn verify (root: Commitment, mut tree_proofs: Vec<Option<ProofNode>>, width: usize, indices: Vec<usize>, depth: usize, data: Vec<Vec<u8>>, verifier_params: VerifierParams) -> bool {
-        println!("start checking parameters");
+        //tln!("start checking parameters");
         assert!(tree_proofs[0].is_some());
 
         // Check if the root is correct
@@ -272,12 +238,16 @@ impl VerkleTree {
             return false;
         }
 
-        // Check if the proofs are of the correct size, also works if NONE values were already deleted
         tree_proofs.retain(|node| node.is_some());
         // The expected length
-        let mut check_vector: Vec<Vec<usize>> = Self::create_index_for_proof(indices, width, depth);
-        check_vector.retain(|vector| !vector.is_empty());
-        if tree_proofs.len() != check_vector.len() {
+        let check_vector: Vec<Vec<Vec<usize>>> = Self::create_index_for_proof(indices, width, depth);
+        // To check the expected length we filter on non empty vectors. 
+        let length = check_vector.iter()
+            .flat_map(|layer| layer.iter()) 
+            .filter(|node_vec| {
+                !node_vec.is_empty()})
+            .count();
+        if tree_proofs.len() != length {
             println!("The tree proofs vector is not of the correct length");
             return false;
         }
@@ -317,22 +287,19 @@ impl VerkleTree {
     }
 
     pub fn depth(&self) -> usize {
-        let mut depth = 0;
-
-        let mut current_node = self.root.clone().unwrap(); // TODO: error handling
-        while current_node.children.is_some() {
-            depth += 1;
-            current_node = current_node.children.unwrap()[0].clone();
-        }
-        depth
+        self.nodes.len()
     }
 
-    pub fn root_commitment(&self) -> Option<Commitment> {
-        // match &self.root {
-        //     None => None,
-        //     Some(verkle_node) => Some(verkle_node.commitment),
-        // }
-        self.root.as_ref().map(|verkle_node| verkle_node.commitment.clone())
+    pub fn root_commitment(&self) -> Option<Commitment>{
+        match self.nodes.is_empty() {
+            true => None,
+            false => {
+                match self.nodes[0].is_empty(){
+                    true => None,
+                    false => Some(self.nodes[0][0].commitment.clone()),
+                }
+            }
+        }
     }
 }
 

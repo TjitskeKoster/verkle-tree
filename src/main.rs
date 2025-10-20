@@ -8,12 +8,11 @@ use std::io::Write;
 
 use rand::Rng;
 use rand::prelude::*;
-mod verkle_tree_point;
 use rayon::vec;
+
+mod verkle_tree_point;
 use verkle_tree_point::{VerkleTree as VerkleTree_point};
 
-mod verkle_tree_point_new;
-use verkle_tree_point_new::{VerkleTree as VerkleTree_new};
 
 //The following is to import data from a file in the root of the folder.
 
@@ -35,7 +34,9 @@ fn get_receiver_data (size_input: usize) -> Vec<Vec<u8>>{
     input
 }
 
-fn old (width:usize, input_len:usize, data: &Vec<Vec<u8>>) {
+
+
+fn example (width:usize, input_len:usize, data: &Vec<Vec<u8>>) {
     //println!("create parameters");
     let (prover_params, verifier_params) =
         pointproofs::pairings::param::paramgen_from_seed("This is our Favourite very very long Seed", 0, width).unwrap();
@@ -48,7 +49,6 @@ fn old (width:usize, input_len:usize, data: &Vec<Vec<u8>>) {
     
     let indices: Vec<usize> = (0..=(input_len-1) )
         .choose_multiple(&mut thread_rng(),(input_len as f64 *(0.2))as usize);
-    
     //println!("We'll start proving");
     let startproof = Instant::now();
     let proof = tree.proof(indices.clone(), &data);
@@ -73,53 +73,9 @@ fn old (width:usize, input_len:usize, data: &Vec<Vec<u8>>) {
     let verify_test= startverify.elapsed();
     //println!("end verify");
 
-
-    println!("OLD tree creat {:?}", tree_test.as_millis());
-    println!("OLD proof time {:?}", endproof_test.as_millis());
-    println!("OLD verif time {:?}", verify_test.as_millis());
-}
-
-
-fn new (width:usize, input_len:usize, data: &Vec<Vec<u8>>) {
-    //println!("create parameters");
-    let (prover_params, verifier_params) =
-        pointproofs::pairings::param::paramgen_from_seed("This is our Favourite very very long Seed", 0, width).unwrap();
-    
-    //println!("start making tree");
-    let start = Instant::now();
-    let tree: VerkleTree_new = VerkleTree_new::new(&data, width, prover_params).unwrap();
-    let tree_test= start.elapsed();
-   // println!("Tree is constructed");
-    
-    let indices: Vec<usize> = (0..=(input_len-1) )
-        .choose_multiple(&mut thread_rng(),(input_len as f64 *(0.2))as usize);
-    //println!("We'll start proving");
-    let startproof = Instant::now();
-    let proof = tree.proof(indices.clone(), &data);
-    let endproof_test= startproof.elapsed();
-    //println!("We are done proving");
-
-    //println!("Commitment");
-    let root = tree.root_commitment().unwrap();
-    let depth = tree.depth();
-    //println!("commitment done");
-
-    //println!("data to verify");
-
-    let mut datas_verify: Vec<Vec<u8>> = Vec::new();
-    for i in indices.clone() {
-        datas_verify.push(data[i].clone());
-    }
-
-    //println!("start verify");
-    let startverify = Instant::now();
-    let b = VerkleTree_new::verify(root, proof.clone(), width, indices, depth, datas_verify, verifier_params);
-    let verify_test= startverify.elapsed();
-    //println!("end verify");
-
-    println!("NEW tree creat {:?}", tree_test.as_millis());
-    println!("NEW proof time {:?}", endproof_test.as_millis());
-    println!("NEW verif time {:?}", verify_test.as_millis());
+    println!("tree create {:?}", tree_test.as_millis());
+    println!("proof time {:?}", endproof_test.as_millis());
+    println!("verify time {:?}", verify_test.as_millis());
 }
 
 
@@ -141,8 +97,7 @@ fn main (){
     println!("got data");
 
     for i in 0 .. 10 {
-        new(width, input_len, &data);
-        old(width, input_len, &data);
+        example(width, input_len, &data);
     }
     // let width = 3;
     // let input_len = 9;
