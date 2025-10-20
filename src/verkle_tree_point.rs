@@ -118,15 +118,9 @@ impl VerkleTree {
         let width = self.width;
         // The following line creates a vector, on each index is a vector which incidates which children nodes need to be proven
         //println!("create index for proof");
-        let index_for_proof = VerkleTree::create_index_for_proof(index, width, self.depth());
+        let index_for_proof = Self::create_index_for_proof(index, width, self.depth());
         //println!("done creating indices");
         let tree = self.nodes.clone();
-        // for i in tree.clone(){
-        //     for node in i {
-        //         println!("{}", node.children);
-        //     }
-        // }
-        //println!("tree {:?}", tree);
 
         /* We observe that we can compute each node in parallel, so first we flatten the tree structure
             While, perserving the layer and node index */

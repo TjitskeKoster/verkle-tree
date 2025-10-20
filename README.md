@@ -14,25 +14,13 @@ verkle-tree = "0.1.0"
 ```
 
 ### Usage
-Here is a basic example of how to use the library:
+See main.rs for a basic example of how to use the library.
+KZG proofs will be slower than the pointproofs. 
 
-```rust
-use verkle_tree::{VerkleTree, VerkleProof};
-use ark_bls12_381::Fr as F;
+### Debugging
+``` assertion failed: self.coeffs.last().map_or(false, |coeff| !coeff.is_zero()) ```
+Take different data, the KZG proofs made a trivial polynomial which it is unable to proof. 
 
-fn main() {
-    let datas = vec![F::from(10), F::from(20), F::from(30), F::from(40), F::from(50), F::from(60), F::from(70), F::from(80), F::from(90), F::from(100), F::from(110), F::from(120), F::from(130), F::from(140), F::from(150), F::from(160)];
-
-    let width = 4;
-    let verkle_tree = VerkleTree::new(&datas, width);
-    let index = 0;
-    let data_at_index = datas[index];
-    let proof = verkle_tree.generate_proof(index, &data_at_index);
-    let root = VerkleTree::root_commitment(&verkle_tree).unwrap();
-    let is_valid = VerkleTree::verify_proof(root, &proof, width);
-    assert!(is_valid);
-}
-```
 ### Testing
 To run the tests, use the following command:
 ```bash
