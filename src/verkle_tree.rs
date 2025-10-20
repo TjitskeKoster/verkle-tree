@@ -178,7 +178,7 @@ impl VerkleTree {
         Each index contains either a proof of some children, or a None value
     */
     pub fn generate_batch_proof (&self, index: Vec<usize>, data: &[F]) -> Vec<Option<ProofNode>> {
-        assert!(data.len() % self.width == 0, "Please give a tree that is compeletly filled, i.e. log_{{width}}(data) is a natural number");
+        assert!(data.len().is_multiple_of(self.width), "Please give a tree that is compeletly filled, i.e. log_{{width}}(data) is a natural number");
         assert!(!index.is_empty(), "Please give a non empty index");
         let width = self.width;
         let depth = self.depth();

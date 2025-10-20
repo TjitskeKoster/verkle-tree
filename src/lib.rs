@@ -4,6 +4,9 @@ mod verkle_tree;
 pub use verkle_tree_point::{VerkleTree as VerkleTree_point, VerkleProof as VerkleProof_point, ProofNode as ProofNode_point};
 mod verkle_tree_point;
 
+pub use verkle_tree_point_new::{VerkleTree as VerkleTree_new, VerkleProof as VerkleProof_new, ProofNode as ProofNode_new};
+mod verkle_tree_point_new;
+
 pub use pointproofs::pairings::Commitment as Commitment;
 pub use pointproofs::pairings::ProverParams as ProverParams;
 pub use pointproofs::pairings::VerifierParams as VerifierParams;
