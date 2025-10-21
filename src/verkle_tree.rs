@@ -220,6 +220,7 @@ impl VerkleTree {
         if depth != 0 {
             let mut node_root: Vec<usize> = Vec::new();
             for i in 0 .. width{
+                println!("tree path lengt {} dept {} i {}", tree_path.len(), depth, i); 
                 let child  = &tree_path[tree_path.len()-1][i];
                 if !child.is_empty(){
                     node_root.push(i);
