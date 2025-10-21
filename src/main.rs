@@ -133,7 +133,7 @@ fn main (){
 
     // let width = 4;
 
-    //  example_kzg(width, datas_kzg.len(), &datas_kzg);
+    // example_kzg(width, datas_kzg.len(), &datas_kzg);
 
     // println!("data length {}", datas.len());
     let width = 4;
@@ -160,9 +160,5 @@ fn main (){
         example_pointproofs(width, input_len, &data);
         example_kzg(width, input_len, &data_kzg);
     }
-    // let width = 3;
-    // let input_len = 9;
-    // let data: Vec<Vec<u8>> = vec![vec![0], vec![1], vec![2], vec![3],vec![4], vec![5], vec![6], vec![7],vec![8]];
-    // new(width, input_len, &data);
 
 }
